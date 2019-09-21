@@ -15,7 +15,7 @@ def bp(msg):
 def run():
     global ball
     rospy.init_node('ballspeed', anonymous=True)
-    rospy.Subscriber('ballpose',Pose,bp)
+    rospy.Subscriber('kf_ballpose',Pose,bp)
     bpub = rospy.Publisher('balltwist',Twist,queue_size = 10)
     rate = rospy.Rate(20)
     xo = 0

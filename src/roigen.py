@@ -50,7 +50,6 @@ class image_converter:
     self.i = 0
 
   def callback(self,data):
-    print(sys.version)
     try:
       cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
       self.cv_image = cv_image
