@@ -4,3 +4,5 @@
 <p> Open terminal, connect camera and run ...
  <i> roslaunch sbip cam.launch </i>
  </p>
+ 
+ Test this
