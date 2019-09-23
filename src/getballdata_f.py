@@ -13,6 +13,7 @@ import cv2
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import CameraInfo
 
@@ -31,6 +32,7 @@ class image_converter:
   def __init__(self):
     self.image_pub = rospy.Publisher("ballmask",Image, queue_size = 10)
     self.kf_ballpub = rospy.Publisher("kf_ballpose",Pose, queue_size = 10)
+    self.kf_ballpub2 = rospy.Publisher("kf_balltwist", Twist, queue_size = 10)
     self.bridge = CvBridge()
     self.image_sub = rospy.Subscriber("/fieldroi",Image,self.callback)
     self.timesub = rospy.Subscriber("/usb_cam/camera_info", CameraInfo, self.camcb)
@@ -41,6 +43,7 @@ class image_converter:
     self.Px = np.eye(2, dtype = float)
     self.Py = np.eye(2, dtype = float)
     self.Q = np.eye(2, dtype = float)
+    self.Q[1][1] = 100
     self.H = np.matrix([1,0], dtype = float)
     self.R = np.eye(1, dtype = float)
 
@@ -70,6 +73,7 @@ class image_converter:
       bp.position.y = cY
       
     fbp = Pose()  
+    fbt = Twist()
     if self.init_flag == 0:
 
         self.X[0] = bp.position.x
@@ -91,9 +95,11 @@ class image_converter:
         self.Px = np.matmul((np.eye(2,dtype=float)-np.matmul(self.gain_x,self.H)),self.Px)
         self.Py = np.matmul((np.eye(2,dtype=float)-np.matmul(self.gain_y,self.H)),self.Py)
         
-        print(self.X.item(0),self.Y.item(0))
+        print(self.X.item(1),self.Y.item(1))
         fbp.position.x = int(self.X.item(0))
         fbp.position.y = int(self.Y.item(0))
+        fbt.linear.x = int(self.X.item(1))
+        fbt.linear.y = int(self.Y.item(1))
     '''
         self.state = np.matmul(self.A, self.state)
         self.P = np.matmul(np.matmul(self.A,self.P),np.transpose(self.A)) + self.Q
@@ -107,6 +113,7 @@ class image_converter:
     try:
       self.image_pub.publish(self.bridge.cv2_to_imgmsg(mask_white, "mono8"))
       self.kf_ballpub.publish(fbp)
+      self.kf_ballpub2.publish(fbt)
     except CvBridgeError as e:
       print(e)
 
