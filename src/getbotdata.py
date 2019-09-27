@@ -14,7 +14,7 @@ from sensor_msgs.msg import Image
 from geometry_msgs.msg import Pose
 from cv_bridge import CvBridge, CvBridgeError
 
-lower_white = np.array([(200,200,170)])
+lower_white = np.array([(180,180,170)])
 higher_white = np.array([(255,255,255)])
 lower_yellow = np.array([(120,230,220)])
 higher_yellow = np.array([(155,255,255)])
