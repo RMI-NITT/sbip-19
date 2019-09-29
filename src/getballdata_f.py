@@ -34,6 +34,7 @@ class image_converter:
     self.kf_ballpub = rospy.Publisher("kf_ballpose",Pose, queue_size = 10)
     self.kf_ballpub2 = rospy.Publisher("kf_ball_velocity", Twist, queue_size = 10)
     self.kf_ballpub3 = rospy.Publisher("kf_ball_acceleration", Twist, queue_size = 10)
+    self.kf_ballpub4 = rospy.Publisher("kf_ball_stop", Pose, queue_size = 10)
     self.bridge = CvBridge()
     self.image_sub = rospy.Subscriber("/fieldroi",Image,self.callback)
     self.timesub = rospy.Subscriber("/usb_cam/camera_info", CameraInfo, self.camcb)
@@ -79,6 +80,8 @@ class image_converter:
     fbp = Pose()  
     fbv = Twist()
     fba = Twist()
+    fbs = Pose()
+    
     if self.init_flag == 0:
 
         self.Zx[0] = bp.position.x
@@ -88,7 +91,7 @@ class image_converter:
         self.init_flag = 1
     else:
         print('working')
-        self.A = np.matrix([[1, self.del_t, self.del_t*self.del_t],[0, 1, self.del_t], [0, 0, 1]], dtype=float)
+        self.A = np.matrix([[1, self.del_t, ((self.del_t**2)/2)],[0, 1, self.del_t], [0, 0, 1]], dtype=float)
         
         self.X_prev = self.X
         self.X = np.matmul(self.A,self.X_prev)
@@ -118,12 +121,17 @@ class image_converter:
         fbv.linear.y = float(self.Y.item(1))
         fba.linear.x = float(self.X.item(2))
         fba.linear.y = float(self.Y.item(2))
-        
+
+        fbs.position.x = self.X.item(0) + (self.X.item(1)**2/(2*self.X.item(2)))
+        fbs.position.y = self.Y.item(0) + (self.Y.item(1)**2/(2*self.Y.item(2)))
+        fbs.position.z = fbs.position.x - fbp.position.x
+
     try:
       self.image_pub.publish(self.bridge.cv2_to_imgmsg(mask_white, "mono8"))
       self.kf_ballpub.publish(fbp)
       self.kf_ballpub2.publish(fbv)
       self.kf_ballpub3.publish(fba)
+      self.kf_ballpub4.publish(fbs)
     except CvBridgeError as e:
       print(e)
 
