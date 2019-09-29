@@ -45,10 +45,10 @@ class image_converter:
     self.Px = np.eye(3, dtype = float)
     self.Py = np.eye(3, dtype = float)
     self.Q = 0.01*np.eye(3, dtype = float)
-    self.H = np.eye(3, dtype = float)
-    self.R = np.eye(3, dtype = float)
-    self.Zx = np.matrix([[0],[0], [0]], dtype = float)
-    self.Zy = np.matrix([[0],[0], [0]], dtype = float)
+    self.H = np.matrix([1, 0, 0], dtype = float)
+    self.R = np.eye(1, dtype = float)
+    self.Zx = np.eye(1, dtype = float)
+    self.Zy = np.eye(1, dtype = float)
     self.del_t = 0.067
   
   def camcb(self, msg):
@@ -97,8 +97,6 @@ class image_converter:
         self.X = np.matmul(self.A,self.X_prev)
         self.Px = np.matmul(np.matmul(self.A,self.Px),np.transpose(self.A)) + self.Q
         self.Zx[0] = bp.position.x
-        self.Zx[1] = (self.Zx[0] - self.X_prev[0])/self.del_t
-        self.Zx[2] = (self.Zx[1] - self.X_prev[1])/self.del_t
 
         self.gain_x = np.matmul(np.matmul(self.Px, np.transpose(self.H)), np.linalg.inv(np.matmul(np.matmul(self.H,self.Px),np.transpose(self.H)) + self.R))
         self.X = self.X + np.matmul(self.gain_x, (self.Zx - np.matmul(self.H, self.X)))
@@ -108,9 +106,7 @@ class image_converter:
         self.Y = np.matmul(self.A,self.Y_prev)
         self.Py = np.matmul(np.matmul(self.A,self.Py),np.transpose(self.A)) + self.Q
         self.Zy[0] = bp.position.y        
-        self.Zy[1] = (self.Zy[0] - self.Y_prev[0])/self.del_t
-        self.Zy[2] = (self.Zy[1] - self.Y_prev[1])/self.del_t
-
+        
         self.gain_y = np.matmul(np.matmul(self.Py, np.transpose(self.H)), np.linalg.inv(np.matmul(np.matmul(self.H,self.Py),np.transpose(self.H)) + self.R))
         self.Y = self.Y + np.matmul(self.gain_y, (self.Zy - np.matmul(self.H, self.Y)))
         self.Py = np.matmul((np.eye(3,dtype=float)-np.matmul(self.gain_y,self.H)),self.Py)
@@ -124,7 +120,7 @@ class image_converter:
 
         fbs.position.x = self.X.item(0) + (self.X.item(1)**2/(2*self.X.item(2)))
         fbs.position.y = self.Y.item(0) + (self.Y.item(1)**2/(2*self.Y.item(2)))
-        fbs.position.z = fbs.position.x - fbp.position.x
+        fbs.position.z = fbs.position.y - fbp.position.y
 
     try:
       self.image_pub.publish(self.bridge.cv2_to_imgmsg(mask_white, "mono8"))
