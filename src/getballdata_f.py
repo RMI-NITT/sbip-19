@@ -4,6 +4,7 @@
 ############
 from __future__ import print_function
 
+import math
 import roslib
 import numpy as np
 roslib.load_manifest('sbip')
@@ -36,6 +37,7 @@ class image_converter:
     self.kf_ballpub3 = rospy.Publisher("kf_ball_acceleration", Twist, queue_size = 10)
     self.kf_ballpub4 = rospy.Publisher("kf_ball_stop", Pose, queue_size = 10)
     self.bridge = CvBridge()
+    self.image_pub = rospy.Publisher("ball_prediction",Image, queue_size = 10)
     self.image_sub = rospy.Subscriber("/fieldroi",Image,self.callback)
     self.timesub = rospy.Subscriber("/usb_cam/camera_info", CameraInfo, self.camcb)
     self.t_flag = 0
@@ -44,9 +46,12 @@ class image_converter:
     self.Y = np.matrix([[0],[0], [0]], dtype = float)
     self.Px = np.eye(3, dtype = float)
     self.Py = np.eye(3, dtype = float)
-    self.Q = 0.01*np.eye(3, dtype = float)
+    self.Q = np.eye(3, dtype = float)
+    self.Q[0,0] = 2
+    self.Q[1,1] = 15
+    self.Q[2,2] = 100
     self.H = np.matrix([1, 0, 0], dtype = float)
-    self.R = np.eye(1, dtype = float)
+    self.R = 2*np.eye(1, dtype = float)
     self.Zx = np.eye(1, dtype = float)
     self.Zy = np.eye(1, dtype = float)
     self.del_t = 0.067
@@ -91,7 +96,7 @@ class image_converter:
         self.init_flag = 1
     else:
         print('working')
-        self.A = np.matrix([[1, self.del_t, ((self.del_t**2)/2)],[0, 1, self.del_t], [0, 0, 1]], dtype=float)
+        self.A = np.matrix([[1, self.del_t, ((self.del_t**2)/2)],[0, 1, self.del_t], [0, 0.5, 0]], dtype=float)
         
         self.X_prev = self.X
         self.X = np.matmul(self.A,self.X_prev)
@@ -118,12 +123,19 @@ class image_converter:
         fba.linear.x = float(self.X.item(2))
         fba.linear.y = float(self.Y.item(2))
 
+#This part is some thresholding attempt because prediction diverges when a tends to 0
+#        if((math.sqrt(self.X.item(2)**2 + self.Y.item(2)**2) < 5) & (math.sqrt(self.X.item(2)**2 + self.Y.item(2)**2) < 5)):
+#          fbs.position.x = self.X.item(0)
+#          fbs.position.y = self.Y.item(0)
+#        else:  
         fbs.position.x = self.X.item(0) + (self.X.item(1)**2/(2*self.X.item(2)))
         fbs.position.y = self.Y.item(0) + (self.Y.item(1)**2/(2*self.Y.item(2)))
-        fbs.position.z = fbs.position.y - fbp.position.y
+        
+        cv2.circle(cv_image, (int(fbs.position.x)+320, 283-int(fbs.position.y)), 8 ,(0,0,255))
+    #cv2.line(cv_image, (int(fbp.position.x)+320, 283-int(fbp.position.y)), (int(fbp.position.x)+320+, 283-int(fbp.position.y)), 5, (255,0,0) )
 
     try:
-      self.image_pub.publish(self.bridge.cv2_to_imgmsg(mask_white, "mono8"))
+      self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "bgr8"))
       self.kf_ballpub.publish(fbp)
       self.kf_ballpub2.publish(fbv)
       self.kf_ballpub3.publish(fba)
