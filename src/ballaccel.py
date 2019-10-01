@@ -38,7 +38,7 @@ def bt(msg):
         ay = (vy-vyo)/dt
         tw.linear.x = vx
         tw.linear.y = vy
-    aa.publish(ax)
+    #aa.publish(ax)
     bpub.publish(tw)
     vxo = vx
     vyo = vy 
