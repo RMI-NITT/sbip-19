@@ -13,7 +13,7 @@ vxo = 0
 vyo = 0
 told = 0
 tw = Twist()
-bpub = rospy.Publisher('ballaccel',Twist,queue_size = 10)
+bpub = rospy.Publisher('ballaccela',Twist,queue_size = 10)
 aa = rospy.Publisher('xaccel',Float64,queue_size=10)
 
 def tick(msg):
@@ -36,8 +36,8 @@ def bt(msg):
     if dt != 0:
         ax = (vx-vxo)/dt
         ay = (vy-vyo)/dt
-        tw.linear.x = vx
-        tw.linear.y = vy
+        tw.linear.x = ax
+        tw.linear.y = ay
     #aa.publish(ax)
     bpub.publish(tw)
     vxo = vx
