@@ -44,8 +44,8 @@ class state:
         self.time=0.0
         self.to=0.0
         self.I = np.identity(2)
-        self.A = np.array([[1,self.dt/1000.0],[0,0.5]])
-        self.B = np.array([[1,0],[0,10000/2]])
+        self.A = np.array([[1,self.dt*0.7/1000.0],[0,0.7]])
+        self.B = np.array([[1,self.dt*0.3/1000.0],[0,10000*0.3]])
         self.X_est = np.array([0,0])
         self.KG = self.P.dot(np.linalg.inv(self.P + self.R))
 
@@ -54,7 +54,8 @@ class state:
         global time
         #Kalman filter
         self.dt = time-self.to
-        self.A = np.array([[1,self.dt/1000.0],[0,0.5]])
+        self.A = np.array([[1,self.dt*0.7/1000.0],[0,0.5]])
+        self.B = np.array([[1,self.dt*0.3/1000.0],[0,10000/2]])
         self.Z = z
         self.U = z_com
 
