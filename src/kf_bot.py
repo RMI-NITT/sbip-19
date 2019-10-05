@@ -9,6 +9,8 @@ from std_msgs.msg import Float64,Int32
 time = 0
 zx = np.array([0,0])
 zy = np.array([0,0])
+zx_com = np.array([0.0,0.0])
+zy_com = np.array([0.0,0.0])
 
 def tick(msg):
     global time
@@ -26,31 +28,39 @@ def btwist(msg):
     zx[1] = msg.linear.x
     zy[1] = msg.linear.y
 
+def btwistcom(msg):
+    global zx_com
+    global zy_com
+    zx_com[1] = msg.linear.x
+    zy_com[1] = msg.linear.y
+
 class state:
     def __init__(self,P,Q,R):
         global time
         self.R= R
         self.P= P
+        self.Q=Q
         self.dt=0.0
         self.time=0.0
         self.to=0.0
         self.I = np.identity(2)
-        self.A = np.array([[1,self.dt/1000.0],[0,1]])
-        self.B = np.array([[self.dt,0],[0,0]])
+        self.A = np.array([[1,self.dt/1000.0],[0,0.5]])
+        self.B = np.array([[1,0],[0,10000/2]])
         self.X_est = np.array([0,0])
         self.KG = self.P.dot(np.linalg.inv(self.P + self.R))
 
 
-    def kalman_filter(self,z):
+    def kalman_filter(self,z,z_com):
         global time
         #Kalman filter
         self.dt = time-self.to
-        self.A = np.array([[1,self.dt/1000.0],[0,1]])
+        self.A = np.array([[1,self.dt/1000.0],[0,0.5]])
         self.Z = z
+        self.U = z_com
 
         #prediction
-        self.X_pred=self.A.dot(self.X_est)
-        self.P=self.A.dot(self.P.dot((self.A).T))
+        self.X_pred=self.A.dot(self.X_est) + self.B.dot(self.U)
+        self.P=self.A.dot(self.P.dot((self.A).T)) + self.Q
 
         #update
         self.KG=self.P.dot(np.linalg.inv(self.P + self.R))
@@ -71,12 +81,13 @@ def run():
     rospy.Subscriber('bot1pose',Pose,bpose)
     rospy.Subscriber('Time',Float64,tick)
     rospy.Subscriber('bot1twistmeas',Twist,btwist)
+    rospy.Subscriber('bot1twistglobal',Twist,btwistcom)
     a = rospy.Publisher('/xspeed',Float64,queue_size=10)
     b = rospy.Publisher('/yspeed',Float64,queue_size=10)
     rate = rospy.Rate(20)
     while(True):
-        X = x.kalman_filter(zx)
-        Y = y.kalman_filter(zy)
+        X = x.kalman_filter(zx,zx_com)
+        Y = y.kalman_filter(zy,zy_com)
         print('pose',int(X[0]),int(Y[0]))
         print('twist',X[1],Y[1])
         xs = Float64()
