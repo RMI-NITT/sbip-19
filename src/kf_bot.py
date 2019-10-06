@@ -12,6 +12,7 @@ zy = np.array([0,0])
 zw = 0.0
 zx_com = np.array([0.0,0.0])
 zy_com = np.array([0.0,0.0])
+zw_com = 0.0
 
 def tick(msg):
     global time
@@ -34,8 +35,10 @@ def btwist(msg):
 def btwistcom(msg):
     global zx_com
     global zy_com
+    global zw_com
     zx_com[1] = msg.linear.x
     zy_com[1] = msg.linear.y
+    zw_com = msg.angular.z
 
 class state:
     def __init__(self,P,Q,R):
@@ -53,9 +56,9 @@ class state:
         self.omega_est = 0.0
         #self.KG = self.P.dot(np.linalg.inv(self.P + self.R))
 
-    def dim1_kf(self,z_w):
+    def dim1_kf(self,z_w,zw_com):
         #prediction step
-        x_pred = self.omega_est
+        x_pred = 0.8*self.omega_est + zw_com*0.2
         self.P = self.P + self.Q
         
         # update step
