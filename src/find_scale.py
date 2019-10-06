@@ -10,12 +10,15 @@ from std_msgs.msg import Float64,Int32
 time = 0
 zx = np.array([0.0,0.0])
 zy = np.array([0.0,0.0])
+zw = 0.0
 
 zxcmd = 0.0
 zycmd = 0.0
+zwcmd = 0.0
 
 filteredx = 0.0
 filteredy = 0.0
+filteredw = 0.0
 
 def tick(msg):
     global time
@@ -30,14 +33,19 @@ def bpose(msg):
 def btwist(msg):
     global zx
     global zy
+    global zw
     zx[1] = msg.linear.x*1.0
     zy[1] = msg.linear.y*1.0
+    zw = msg.angular.z*1.0
+
 
 def btwistg(msg):
     global zxcmd
     global zycmd
+    global zwcmd
     zxcmd = msg.linear.x*1.0
     zycmd = msg.linear.y*1.0
+    zwcmd = msg.angular.z*1.0
 
 def da(msg):
     global filteredx
@@ -48,69 +56,41 @@ def db(msg):
     filteredy = msg.data
 
 
-class state:
-    def __init__(self,P,Q,R):
-        global time
-        self.R= R
-        self.P= P
-        self.dt=0.0
-        self.time=0.0
-        self.to=0.0
-        self.I = np.identity(2)
-        self.A = np.array([[1,self.dt/1000.0],[0,1]])
-        self.B = np.array([[self.dt,0],[0,0]])
-        self.X_est = np.array([0,0])
-        self.KG = self.P.dot(np.linalg.inv(self.P + self.R))
-
-
-    def kalman_filter(self,z):
-        global time
-        #Kalman filter
-        self.dt = time-self.to
-        self.A = np.array([[1,self.dt/1000.0],[0,1]])
-        self.Z = z
-
-        #prediction
-        self.X_pred=self.A.dot(self.X_est)
-        self.P=self.A.dot(self.P.dot((self.A).T))
-
-        #update
-        self.KG=self.P.dot(np.linalg.inv(self.P + self.R))
-        self.X_est=self.X_pred + self.KG.dot(self.Z - self.X_pred)
-        self.P= (self.I - self.KG)
-        self.P= self.P.dot(self.P)
-        self.to= time
-        return self.X_est
+def dc(msg):
+    global filteredw
+    filteredw = msg.data
 
 def run():
     global zx
     global zy
+    global zw
     global zxcmd
     global zycmd
+    global zwcmd
     global filteredx
     global filteredy
-    P = np.array([[1,0],[0,0.5]])
-    Q = P
-    R = P + np.array([[0,0],[0,0.5]])
-    x = state(P,Q,R)
-    y = state(P,Q,R)
+    global filteredw
     rospy.Subscriber('bot1pose',Pose,bpose)
     rospy.Subscriber('Time',Float64,tick)
     rospy.Subscriber('bot1twistmeas',Twist,btwist)
     rospy.Subscriber('bot1twistglobal',Twist,btwistg)
     rospy.Subscriber('xspeed',Float64,da)
     rospy.Subscriber('yspeed',Float64,db)
+    rospy.Subscriber('omega',Float64,dc)
     rate = rospy.Rate(20)
     ratio = []
     cmdx = []
     cmdy = []
+    cmdw = []
     measx = []
     measy = []
+    measw = []
     filx = []
     fily = []
+    filw = []
     za = []
     i = 0
-    while(i<1000):
+    while(i<100):
         zcmd = np.sqrt(zxcmd**2 + zycmd**2)
         print zcmd
         if zcmd != 0.0:
@@ -123,20 +103,29 @@ def run():
             cmdy.append(zycmd*3*10**3)
             measy.append(zy[1])
             fily.append(filteredy)
+            cmdw.append(zwcmd*100)
+            measw.append(zw)
+            filw.append(filteredw)
             i = i+1
         rate.sleep()
     print 'done'
 
-    plt.subplot(2, 1, 1)
+    plt.subplot(3, 1, 1)
     plt.plot(cmdx,label='command')
     plt.plot(measx,label='measured')
     plt.plot(filx,label='filtered')
     plt.plot(za)
     plt.legend(loc = 'lower left')
-    plt.subplot(2, 1, 2)
+    plt.subplot(3, 1, 2)
     plt.plot(cmdy,label='command')
     plt.plot(measy,label='measured')
     plt.plot(fily,label='filtered')
+    plt.plot(za)
+    plt.legend(loc = 'lower left')
+    plt.subplot(3, 1, 3)
+    plt.plot(cmdw,label='command')
+    plt.plot(measw,label='measured')
+    plt.plot(filw,label='filtered')
     plt.plot(za)
     plt.legend(loc = 'lower left')
     plt.show()
