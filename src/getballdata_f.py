@@ -47,11 +47,11 @@ class image_converter:
     self.Px = np.eye(3, dtype = float)
     self.Py = np.eye(3, dtype = float)
     self.Q = np.eye(3, dtype = float)
-    self.Q[0,0] = 2
+    self.Q[0,0] = 1
     self.Q[1,1] = 15
-    self.Q[2,2] = 100
+    self.Q[2,2] = 225
     self.H = np.matrix([1, 0, 0], dtype = float)
-    self.R = 2*np.eye(1, dtype = float)
+    self.R = 4*np.eye(1, dtype = float)
     self.Zx = np.eye(1, dtype = float)
     self.Zy = np.eye(1, dtype = float)
     self.del_t = 0.067
@@ -95,8 +95,7 @@ class image_converter:
         fbp.position.y = bp.position.y
         self.init_flag = 1
     else:
-        print('working')
-        self.A = np.matrix([[1, self.del_t, ((self.del_t**2)/2)],[0, 1, self.del_t], [0, 0.5, 0]], dtype=float)
+        self.A = np.matrix([[1, self.del_t, ((self.del_t**2)/2)],[0, 1, self.del_t], [0, 0, 1]], dtype=float)
         
         self.X_prev = self.X
         self.X = np.matmul(self.A,self.X_prev)
@@ -122,17 +121,34 @@ class image_converter:
         fbv.linear.y = float(self.Y.item(1))
         fba.linear.x = float(self.X.item(2))
         fba.linear.y = float(self.Y.item(2))
-
-#This part is some thresholding attempt because prediction diverges when a tends to 0
-#        if((math.sqrt(self.X.item(2)**2 + self.Y.item(2)**2) < 5) & (math.sqrt(self.X.item(2)**2 + self.Y.item(2)**2) < 5)):
-#          fbs.position.x = self.X.item(0)
-#          fbs.position.y = self.Y.item(0)
-#        else:  
-        fbs.position.x = self.X.item(0) + (self.X.item(1)**2/(2*self.X.item(2)))
-        fbs.position.y = self.Y.item(0) + (self.Y.item(1)**2/(2*self.Y.item(2)))
         
-        cv2.circle(cv_image, (int(fbs.position.x)+320, 283-int(fbs.position.y)), 8 ,(0,0,255))
-    #cv2.line(cv_image, (int(fbp.position.x)+320, 283-int(fbp.position.y)), (int(fbp.position.x)+320+, 283-int(fbp.position.y)), 5, (255,0,0) )
+        self.future_X = self.X
+        self.future_Y = self.Y
+        self.future_Px = self.Px
+        self.future_Py = self.Py
+
+        if(math.sqrt(self.X.item(1)**2 + self.Y.item(1)**2) > 3):
+          if(( (self.X.item(1)*self.X.item(2))+ (self.Y.item(1)*self.Y.item(2)) <0) ):
+            print('decelerating')
+            self.count = 0
+            while((math.sqrt(self.future_X.item(1)**2 + self.future_Y.item(1)**2) > 20)):
+              self.count += 1
+              if(self.count > 200):
+                break
+              self.future_X = np.matmul(self.A, self.future_X)
+              self.future_Px = np.matmul(np.matmul(np.transpose(self.A), self.future_Px),self.A) + self.Q
+              self.future_Y = np.matmul(self.A, self.future_Y)
+              self.future_Py = np.matmul(np.matmul(np.transpose(self.A), self.future_Py),self.A) + self.Q
+              print('propagating, count = ', self.count)
+          fbs.position.x = self.future_X[0]
+          fbs.position.y = self.future_Y[0]
+        else:
+          fbs.position.x = self.X[0]
+          fbs.position.y = self.Y[0]
+        
+    self.radius = int(math.sqrt(self.future_Px.item(0)**2 + self.future_Py.item(0)**2))
+    cv2.ellipse(cv_image, (int(fbs.position.x)+320, 283-int(fbs.position.y)), (int(self.future_Px.item(0)),int(self.future_Py.item(0))),0,0,360,(0,0,255))
+    cv2.circle(cv_image, (int(fbs.position.x)+320, 283-int(fbs.position.y)), 1, (0,0,255), thickness=-1)
 
     try:
       self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "bgr8"))
