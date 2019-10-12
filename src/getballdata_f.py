@@ -31,7 +31,7 @@ def ftransform(x,y):
 class image_converter:
 
   def __init__(self):
-    self.image_pub = rospy.Publisher("ballmask",Image, queue_size = 10)
+ #   self.image_pub = rospy.Publisher("ballmask",Image, queue_size = 10)
     self.kf_ballpub = rospy.Publisher("kf_ballpose",Pose, queue_size = 10)
     self.kf_ballpub2 = rospy.Publisher("kf_ball_velocity", Twist, queue_size = 10)
     self.kf_ballpub3 = rospy.Publisher("kf_ball_acceleration", Twist, queue_size = 10)
@@ -39,7 +39,6 @@ class image_converter:
     self.bridge = CvBridge()
     self.image_pub = rospy.Publisher("ball_prediction",Image, queue_size = 10)
     self.image_sub = rospy.Subscriber("/fieldroi",Image,self.callback)
-    self.timesub = rospy.Subscriber("/usb_cam/camera_info", CameraInfo, self.camcb)
     self.t_flag = 0
     self.init_flag = 0
     self.X = np.matrix([[0],[0], [0]], dtype = float)
@@ -48,20 +47,16 @@ class image_converter:
     self.Py = np.eye(3, dtype = float)
     self.Q = np.eye(3, dtype = float)
     self.Q[0,0] = 1
-    self.Q[1,1] = 15
-    self.Q[2,2] = 225
-    self.H = np.matrix([1, 0, 0], dtype = float)
-    self.R = 4*np.eye(1, dtype = float)
-    self.Zx = np.eye(1, dtype = float)
-    self.Zy = np.eye(1, dtype = float)
+    self.Q[1,1] = 50
+    self.Q[2,2] = 200
+    self.H = np.matrix([[1, 0, 0],[0, 1, 0]], dtype = float)
+    self.R = np.eye(2, dtype = float)
+    self.R[0,0] = 2
+    self.R[1,1] = 30
+    #self.R[2,2] = 225
+    self.Zx = np.matrix([[0],[0]], dtype = float)
+    self.Zy = np.matrix([[0],[0]],  dtype = float)
     self.del_t = 0.067
-  
-  def camcb(self, msg):
-    if self.t_flag == 0:
-        self.t0 = msg.header.seq
-        self.t_s = self.t0
-        self.t_flag = 1
-    self.t = msg.header.seq - self.t0
 
   def callback(self,data):
     try:
@@ -101,6 +96,8 @@ class image_converter:
         self.X = np.matmul(self.A,self.X_prev)
         self.Px = np.matmul(np.matmul(self.A,self.Px),np.transpose(self.A)) + self.Q
         self.Zx[0] = bp.position.x
+        self.Zx[1] = (self.Zx[0] - self.X_prev[0])/self.del_t
+        #self.Zx[2] = (self.Zx[1] - self.X_prev[1])/self.del_t
 
         self.gain_x = np.matmul(np.matmul(self.Px, np.transpose(self.H)), np.linalg.inv(np.matmul(np.matmul(self.H,self.Px),np.transpose(self.H)) + self.R))
         self.X = self.X + np.matmul(self.gain_x, (self.Zx - np.matmul(self.H, self.X)))
@@ -110,6 +107,8 @@ class image_converter:
         self.Y = np.matmul(self.A,self.Y_prev)
         self.Py = np.matmul(np.matmul(self.A,self.Py),np.transpose(self.A)) + self.Q
         self.Zy[0] = bp.position.y        
+        self.Zy[1] = (self.Zy[0] - self.Y_prev[0])/self.del_t
+        #self.Zy[2] = (self.Zy[1] - self.Y_prev[1])/self.del_t
         
         self.gain_y = np.matmul(np.matmul(self.Py, np.transpose(self.H)), np.linalg.inv(np.matmul(np.matmul(self.H,self.Py),np.transpose(self.H)) + self.R))
         self.Y = self.Y + np.matmul(self.gain_y, (self.Zy - np.matmul(self.H, self.Y)))
@@ -131,9 +130,9 @@ class image_converter:
           if(( (self.X.item(1)*self.X.item(2))+ (self.Y.item(1)*self.Y.item(2)) <0) ):
             print('decelerating')
             self.count = 0
-            while((math.sqrt(self.future_X.item(1)**2 + self.future_Y.item(1)**2) > 20)):
+            while(math.sqrt(self.future_X.item(1)**2 + self.future_Y.item(1)**2) > 30):
               self.count += 1
-              if(self.count > 200):
+              if(self.count > 400):
                 break
               self.future_X = np.matmul(self.A, self.future_X)
               self.future_Px = np.matmul(np.matmul(np.transpose(self.A), self.future_Px),self.A) + self.Q
@@ -148,7 +147,7 @@ class image_converter:
         
     self.radius = int(math.sqrt(self.future_Px.item(0)**2 + self.future_Py.item(0)**2))
     cv2.ellipse(cv_image, (int(fbs.position.x)+320, 283-int(fbs.position.y)), (int(self.future_Px.item(0)),int(self.future_Py.item(0))),0,0,360,(0,0,255))
-    cv2.circle(cv_image, (int(fbs.position.x)+320, 283-int(fbs.position.y)), 1, (0,0,255), thickness=-1)
+    cv2.circle(cv_image, (int(fbs.position.x)+320, 283-int(fbs.position.y)), 8, (0,0,255), thickness=-1)
 
     try:
       self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "bgr8"))
