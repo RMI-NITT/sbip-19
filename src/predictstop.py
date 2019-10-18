@@ -27,7 +27,7 @@ class image_converter:
         rospy.Subscriber('/kf_ball_acceleration',Twist, self.bacce)
         rospy.Subscriber('/ball_Px', numpy_msg(Floats), self.Px_cb)
         rospy.Subscriber('/ball_Py', numpy_msg(Floats), self.Py_cb)
-        self.time_sub = rospy.Subscriber("/Time", Float64, self.time_cb)
+        rospy.Subscriber("/Time", Float64, self.time_cb)
         self.pts = []
         self.X = np.matrix([[0],[0], [0]], dtype = float)
         self.Y = np.matrix([[0],[0], [0]], dtype = float)
@@ -60,8 +60,7 @@ class image_converter:
 
     def Px_cb(self,msg):
         self.Px = np.reshape(msg.data, (3,3))
-
-
+        
     def Py_cb(self,msg):
         self.Py = np.reshape(msg.data, (3,3))
 
@@ -74,22 +73,20 @@ class image_converter:
         self.A = np.matrix([[1, self.del_t, ((self.del_t**2)/2)],[0, 1, self.del_t], [0, 0, 1]], dtype=float)
         self.future_X = self.X
         self.future_Y = self.Y
-        self.future_Px = self.Px
-        self.future_Py = self.Py
+        self.future_Px = self.Px[0,0]
+        self.future_Py = self.Py[0,0]
+        self.stop_t = 0
+        self.stop_frame_count = 0
 
         if(math.sqrt(self.X.item(1)**2 + self.Y.item(1)**2) > 3):
           if(( (self.X.item(1)*self.X.item(2))+ (self.Y.item(1)*self.Y.item(2)) <0) ):
-            print('decelerating')
-            self.count = 0
-            while(math.sqrt(self.future_X.item(1)**2 + self.future_Y.item(1)**2) > 30):
-              self.count += 1
-              if(self.count > 200):
-                break
-              self.future_X = np.matmul(self.A, self.future_X)
-              self.future_Px = np.matmul(np.matmul(np.transpose(self.A), self.future_Px),self.A) + self.Q
-              self.future_Y = np.matmul(self.A, self.future_Y)
-              self.future_Py = np.matmul(np.matmul(np.transpose(self.A), self.future_Py),self.A) + self.Q
-              print('propagating, count = ', self.count)
+            self.stop_t = math.sqrt(self.X.item(1)**2 + self.Y.item(1)**2)   / math.sqrt(self.X.item(2)**2 + self.Y.item(2)**2)
+            self.stop_frame_count = int(self.stop_t/self.del_t) + 1
+            self.A = np.matrix([[1, (self.stop_frame_count*self.del_t), (((self.stop_frame_count*self.del_t)**2)/2)],[0, 1, (self.stop_frame_count*self.del_t)], [0, 0, 1]], dtype=float)
+            self.future_X = np.matmul(self.A, self.X)
+            self.future_Px = np.matmul(np.matmul(np.transpose(self.A), self.Px),self.A).item(0) + self.stop_frame_count*self.Q[0,0]
+            self.future_Y = np.matmul(self.A, self.Y)
+            self.future_Py = np.matmul(np.matmul(np.transpose(self.A), self.Py),self.A).item(0) + self.stop_frame_count*self.Q[0,0]
           self.x_stop = self.future_X[0]
           self.y_stop = self.future_Y[0]
         else:
@@ -97,8 +94,8 @@ class image_converter:
           self.y_stop = self.Y[0]
         
         self.radius = int(math.sqrt(self.future_Px.item(0)**2 + self.future_Py.item(0)**2))
-        cv2.circle(cv_image, (int(self.x_stop)+320, 283-int(self.y_stop)), self.radius, 1)
-        cv2.circle(cv_image, (int(self.x_stop)+320, 283-int(self.y_stop)), 8, 1, thickness=-1)
+        cv2.circle(cv_image, (int(self.x_stop)+320, 283-int(self.y_stop)), self.radius, (0, 0, 255))
+        cv2.circle(cv_image, (int(self.x_stop)+320, 283-int(self.y_stop)), 8, (0, 0, 255), thickness=-1)
         cv2.imshow("Image window", cv_image)
         cv2.waitKey(3)  
         try:

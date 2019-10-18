@@ -17,6 +17,7 @@ from geometry_msgs.msg import Pose, Twist
 from cv_bridge import CvBridge, CvBridgeError
 from rospy.numpy_msg import numpy_msg
 from rospy_tutorials.msg import Floats
+from ballpose_predict import predict_pose
 
 lower_white = np.array([(230,230,230)])
 higher_white = np.array([(255,255,255)])
@@ -39,7 +40,7 @@ class image_converter:
     self.Py_pub = rospy.Publisher("ball_Py", numpy_msg(Floats), queue_size=10)
     self.bridge = CvBridge()
     self.image_sub = rospy.Subscriber("/fieldroi",Image,self.callback)
-    self.time_sub = rospy.Subscriber("/Time", Float64, self.time_cb)
+    rospy.Subscriber("/Time", Float64, self.time_cb)
     self.init_flag = 0
     self.X = np.matrix([[0],[0], [0]], dtype = np.float32)
     self.Y = np.matrix([[0],[0], [0]], dtype = np.float32)
@@ -133,6 +134,7 @@ class image_converter:
       self.kf_ballpub4.publish(fbs)
       self.Px_pub.publish(np.reshape(self.Px, (9,1)))
       self.Py_pub.publish(np.reshape(self.Py, (9,1)))
+      print(predict_pose(self.X, self.Y, self.Px, self.Py, self.del_t, -1))
     except CvBridgeError as e:
       print(e)
 
