@@ -12,7 +12,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 #p1,p2,p3,p4
 
-points_1 = np.float32([(95,16),(588,8),(98,477),(636,454)]) 
+points_1 = np.float32([(90,21),(596,13),(73,478),(621,479)]) 
 points_2 = np.float32([(0,0),(640,0),(0,566),(640,566)])
 
 lower_red = np.array([0,220,180])
